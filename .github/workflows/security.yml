@@ -1,60 +1,89 @@
 name: Security Scan
 
 on:
-push:
-branches: ["main"]
-pull_request:
+  push:
+    branches: ["main"]
+  pull_request:
 
 jobs:
-scan:
-runs-on: ubuntu-latest
+  security-scan:
+    runs-on: ubuntu-latest
 
-```
-steps:
-- name: Checkout
-  uses: actions/checkout@v4
+    steps:
+      # ------------------------
+      # Checkout code
+      # ------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-- name: Setup Node
-  uses: actions/setup-node@v4
-  with:
-    node-version: 18
+      # ------------------------
+      # Setup Node.js
+      # ------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-- name: Install dependencies
-  run: npm install
+      # ------------------------
+      # Install dependencies
+      # ------------------------
+      - name: Install dependencies
+        run: npm install
 
-# Start Express server
-- name: Start app
-  run: |
-    node src/server.js &
-    sleep 5
+      # ------------------------
+      # Start Express App
+      # ------------------------
+      - name: Start application
+        run: |
+          node src/server.js &
+          sleep 5
 
-# ---------------- SNYK ----------------
-- name: Install Snyk
-  run: |
-    curl --compressed https://downloads.snyk.io/cli/latest/snyk-linux -o snyk
-    chmod +x snyk
-    sudo mv snyk /usr/local/bin/
+      # ------------------------
+      # Install Snyk CLI
+      # ------------------------
+      - name: Install Snyk CLI
+        run: |
+          curl --compressed https://downloads.snyk.io/cli/latest/snyk-linux -o snyk
+          chmod +x snyk
+          sudo mv snyk /usr/local/bin/
 
-- name: Auth Snyk
-  run: snyk auth ${{ secrets.SNYK_TOKEN }}
+      # ------------------------
+      # Authenticate Snyk
+      # ------------------------
+      - name: Authenticate Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
-- name: Run Snyk test
-  run: snyk test || true
+      # ------------------------
+      # Run Snyk test
+      # ------------------------
+      - name: Run Snyk test
+        run: snyk test || true
 
-# ---------------- ZAP ----------------
-- name: Pull ZAP
-  run: docker pull ghcr.io/zaproxy/zaproxy:stable
+      # ------------------------
+      # Pull OWASP ZAP image
+      # ------------------------
+      - name: Pull OWASP ZAP image
+        run: docker pull ghcr.io/zaproxy/zaproxy:stable
 
-- name: Run ZAP scan
-  run: |
-    docker run --rm \
-      --network="host" \
-      -v $(pwd):/zap/wrk/:rw \
-      ghcr.io/zaproxy/zaproxy:stable \
-      zap-baseline.py -t http://localhost:3000 -r report.html -I
+      # ------------------------
+      # Run ZAP Baseline Scan
+      # ------------------------
+      - name: Run ZAP Baseline Scan
+        run: |
+          docker run --rm \
+            --network="host" \
+            -v $(pwd):/zap/wrk/:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:3000 \
+            -r report.html \
+            -I
 
-- name: Upload report
-  uses: actions/upload-artifact@v4
-  with:
-    name: zap-report
-    path: report.html
+      # ------------------------
+      # Upload ZAP Report
+      # ------------------------
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: report.html
